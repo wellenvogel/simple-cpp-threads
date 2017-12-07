@@ -17,28 +17,53 @@
 #include <mutex>
 #include <condition_variable>
 //simple automatic unlocking mutex
-typedef std::lock_guard<std::mutex> Synchronized;
+typedef std::unique_lock<std::mutex> Synchronized;
 
 //simple condition variable that encapsulates the monitor
+//you need to ensure that the monitor life cycle fits
+//to the condition life cycle
 class Condition{
 private:
-    std::mutex mutex;
+    std::mutex *mutex;
     std::condition_variable cond;
+    bool ownsMutex=false;
 public:
+    Condition(std::mutex &m){
+        mutex=&m;
+    }
+    Condition(){
+        mutex=new std::mutex();
+        ownsMutex=true;
+    }
+    ~Condition(){
+        if (ownsMutex) delete mutex;
+    }
     void wait(){
-        std::unique_lock<std::mutex> l(mutex);
+        Synchronized l(*mutex);
         cond.wait(l);
     };
     void wait(int millis){
-        std::unique_lock<std::mutex> l(mutex);
+        Synchronized l(*mutex);
         cond.wait_for(l,std::chrono::milliseconds(millis));
     }
+    void wait(Synchronized &s){
+        cond.wait(s);
+    }
+    void wait(Synchronized &s,int millis){
+        cond.wait_for(s,std::chrono::milliseconds(millis));
+    }
     void notify(){
-        Synchronized g(mutex);
+        Synchronized g(*mutex);
+        cond.notify_one();
+    }
+    void notify(Synchronized &s){
         cond.notify_one();
     }
     void notifyAll(){
-        Synchronized g(mutex);
+        Synchronized g(*mutex);
+        cond.notify_all();
+    }
+    void notifyAll(Synchronized &s){
         cond.notify_all();
     }
 };

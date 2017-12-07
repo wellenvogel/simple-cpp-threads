@@ -12,17 +12,19 @@ typedef enum{
 //runnable class
 class MyRunnable : public Runnable {
 private:
-    Condition condition;
     mutex mmutex;
+    Condition *condition;
     ThreadState requestedState=INIT;
     ThreadState currentState=INIT;
     int id;
-    void wakeUp(){
-        condition.notifyAll();
-    };
+   
 public:
     MyRunnable(int id){
         this->id=id;
+        condition=new Condition(mmutex);
+    }
+    ~MyRunnable(){
+        delete condition;
     }
     int getId(){
         return id;
@@ -31,8 +33,8 @@ public:
         {
         Synchronized x(mmutex);
         requestedState=nState;
+        condition->notifyAll(x);
         }
-        wakeUp();
     };
     ThreadState getState(){
         Synchronized x(mmutex);
@@ -45,7 +47,6 @@ public:
         }
         cout << "Thread "<<id<<" started" << endl;
         while(true){
-            condition.wait(1000);
             {
                 Synchronized x(mmutex);
                 if (requestedState==STOP){
@@ -53,6 +54,7 @@ public:
                     cout << "stopping thread "<<id<<endl;
                     return;
                 }
+                condition->wait(x,1000);
             }
             cout << "hello thread " <<id<< endl;
         }
